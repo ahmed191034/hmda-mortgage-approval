@@ -5,7 +5,7 @@ government lending data — and examining the drivers behind lending decisions.
 
 ## Problem
 Lenders (and regulators) care about who gets approved, who gets denied, and why. This project builds
-a clean, analysis-ready dataset from raw HMDA filings and works toward a model that predicts loan
+a clean, analysis-ready dataset from raw HMDA filings and trains models that predict loan
 approval from applicant, loan, property and location features — while flagging fairness patterns
 across demographic groups.
 
@@ -29,11 +29,26 @@ across demographic groups.
    - **ANOVA F-test** for numeric features vs approval — strongest: `income`, `property_value`.
    - **VIF** for multicollinearity — all features < 2 (well under the 5 threshold), none redundant.
    - Correlation heatmap confirmed only mild feature-to-feature overlap (max ≈ 0.51).
-4. **Leakage control** — excluded columns that reveal the outcome (`loan_outcome`, `denial_reason_*`).
-5. **Modelling** *(in progress)* — comparing Logistic Regression, Random Forest and XGBoost,
-   evaluated on F1 given the class imbalance.
+4. **Leakage control** — excluded columns that reveal the outcome (`loan_outcome`, `denial_reason_*`)
+   and `interest_rate` (missing for 100% of denials, so it leaks the target).
+5. **Modelling** — stratified 70/20/10 train/validation/test split, categorical encoding, and
+   **SMOTE-NC** applied to the training set only to handle class imbalance. Compared Logistic
+   Regression, Random Forest, XGBoost and a tuned Keras MLP (Keras Tuner), plus a **least-squares
+   ensemble** that blends the models' probabilities to minimise error.
 
-## Key findings so far
+## Results (validation set)
+| Model | Accuracy | macro-F1 | F1 (denied) | F1 (approved) |
+|---|---|---|---|---|
+| Logistic Regression | 0.773 | 0.690 | 0.530 | 0.850 |
+| Random Forest | 0.969 | 0.956 | 0.932 | 0.980 |
+| **XGBoost (final)** | **0.970** | **0.956** | **0.932** | **0.980** |
+
+**XGBoost is the chosen model.** It ties Random Forest on macro-F1 and edges ahead on overall
+accuracy, on a leakage-free feature set. Logistic Regression is kept as a linear baseline. The
+tree-based models handle the categorical, interaction-heavy signal far better than the linear one,
+as the feature analysis predicted.
+
+## Key findings
 - No single numeric feature strongly predicts approval on its own (best is income, r ≈ 0.12);
   the decision is driven by **categorical factors and combinations**, favouring tree-based models.
 - **Debt-to-income** is the single strongest signal in the categorical tests.
@@ -43,14 +58,16 @@ across demographic groups.
 ## Repository contents
 | File | What it is |
 |---|---|
-| `HMDA_Model.ipynb` | Main notebook: cleaning, EDA, statistical tests, findings |
+| `HMDA_Model.ipynb` | Cleaning, EDA, statistical tests, findings |
+| `hmda_pipeline_clean.ipynb` | End-to-end modelling pipeline: clean → SMOTE-NC → LogReg / RF / XGBoost / Keras → least-squares ensemble |
 | `HMDA_Data_Dictionary.md` | Column-by-column guide and rename map |
 | `HMDA_Mortgage_Project_Plan.md` | Full project plan and business questions |
 | `hmda_clean.py` | Data cleaning script |
 | `hmda_feature_tests.py` | Statistical feature tests |
 
 ## Tools
-Python (pandas, numpy, matplotlib, scipy, statsmodels) · Jupyter
+Python (pandas, numpy, matplotlib, scipy, statsmodels, scikit-learn, imbalanced-learn, XGBoost, Keras) · Jupyter
 
 ## Status
-🚧 In progress — data cleaning, EDA and feature selection complete; modelling and dashboard next.
+✅ Modelling complete — cleaning, EDA, feature selection and modelling done (XGBoost final,
+macro-F1 ≈ 0.96). Dashboard next.
